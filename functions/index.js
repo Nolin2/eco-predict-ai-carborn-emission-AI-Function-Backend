@@ -8,6 +8,9 @@
  * 3. AI Analysis: Calls the Gemini API securely using a secret environment variable.
  * 4. Rate Limiting: Decrements the analysis count for 'free' tier users.
  */
+import express from 'express';
+import cors from 'cors';
+import { GoogleGenAI } from '@google/genai';
 
 const admin = require('firebase-admin');
 const { GoogleGenAI } = require('@google/genai');
