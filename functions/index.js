@@ -8,13 +8,27 @@
  * 3. AI Analysis: Calls the Gemini API securely using a secret environment variable.
  * 4. Rate Limiting: Decrements the analysis count for 'free' tier users.
  */
-import express from 'express';
-import cors from 'cors';
-import { GoogleGenAI } from '@google/genai';
+/**
+ * Google Cloud Function (GCF) exported as 'runAnalysis_function'.
+ * This function serves as the secure backend endpoint for the EcoPredict AI tool.
+ *
+ * CRITICAL FUNCTIONS:
+ * 1. Authentication: Verifies the Firebase ID Token sent from the client.
+ * 2. Authorization: Checks the user's subscription status in Firestore (pro/free).
+ * 3. AI Analysis: Calls the Gemini API securely using a secret environment variable.
+ * 4. Rate Limiting: Decrements the analysis count for 'free' tier users.
+ */
 
-const admin = require('firebase-admin');
-const { GoogleGenAI } = require('@google/genai');
-const cors = require('cors')({ origin: true });
+// --- CRITICAL FIX: Using ES Module syntax for all imports ---
+import express from 'express';
+import { GoogleGenAI } from '@google/genai';
+// For CJS modules like 'firebase-admin', we use the import * as syntax
+import * as admin from 'firebase-admin'; 
+// Import 'cors' and initialize it immediately for the GCF wrapper pattern
+import corsModule from 'cors'; 
+
+const cors = corsModule({ origin: true });
+
 
 // Configuration and Initialization
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -28,9 +42,10 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
-const ai = new GoogleGenAI(GEMINI_API_KEY);
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY }); // Use object syntax for API key
 
 // Use the K_SERVICE environment variable or fallback to a default
+// K_SERVICE is used in GCF, which corresponds to __app_id in Canvas environment
 const appId = typeof process.env.K_SERVICE !== 'undefined' ? process.env.K_SERVICE : 'default-app-id';
 
 /**
@@ -92,6 +107,8 @@ async function checkSubscription(userId) {
  * @returns {Promise<object>} The parsed JSON response from the AI.
  */
 async function runGeminiAnalysis(analysisData) {
+    // Note: The prompt is requesting JSON output, so we need to ensure the response is
+    // parsed correctly and handles the model's text part.
     const prompt = `Analyze the following operational data for a company to predict its total annual carbon footprint in metric tons of CO2e. Then, provide actionable solutions and explain the problems. The output MUST be a valid JSON object matching the following structure. Do not include any text outside the JSON block.
 
 Operational Data: ${JSON.stringify(analysisData)}
