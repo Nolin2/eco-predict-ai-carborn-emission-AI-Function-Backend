@@ -1,13 +1,4 @@
-**
- * Express Server for EcoPredict AI Carbon Emission Analysis.
- * This server runs on Render and hosts the API endpoint '/runAnalysis'.
- *
- * It combines the necessary Firebase Admin initialization, authorization logic,
- * and the Gemini AI call into a standard Express architecture.
- *
- * CRITICAL FIX: Changed Firebase Admin imports to use the modern, module-specific
- * imports (e.g., 'firebase-admin/app') to resolve the 'getApps' TypeError in ESM environments.
- */
+
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
 import corsModule from 'cors'; 
