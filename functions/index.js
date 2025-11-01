@@ -1,19 +1,25 @@
-/**
+**
  * Express Server for EcoPredict AI Carbon Emission Analysis.
  * This server runs on Render and hosts the API endpoint '/runAnalysis'.
  *
  * It combines the necessary Firebase Admin initialization, authorization logic,
  * and the Gemini AI call into a standard Express architecture.
+ *
+ * CRITICAL FIX: Changed Firebase Admin imports to use the modern, module-specific
+ * imports (e.g., 'firebase-admin/app') to resolve the 'getApps' TypeError in ESM environments.
  */
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
-// Import 'firebase-admin' as a namespace for ES Modules
-import * as admin from 'firebase-admin'; 
 import corsModule from 'cors'; 
 
-// --- 1. SETUP & CONFIGURATION ---
+// --- 1. MODERN FIREBASE ADMIN IMPORTS ---
+// Import specific functions from their sub-packages for reliability in ESM
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+
+// --- 2. SETUP & CONFIGURATION ---
 const app = express();
-// Port is required to be read from the environment in cloud hosting environments
 const PORT = process.env.PORT || 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
@@ -22,25 +28,27 @@ const appId = typeof process.env.K_SERVICE !== 'undefined' ? process.env.K_SERVI
 
 
 // Initialization Check
-// --- CRITICAL FIX: Use admin.app.getApps() for initialization check in ESM context ---
-if (!admin.app.getApps().length) {
+// Use the directly imported getApps() function now
+if (getApps().length === 0) {
     // Note: The service account credentials must be configured via environment variables
-    // (e.g., FIREBASE_CREDENTIALS) or deployment secrets in the Render environment.
-    admin.initializeApp();
+    // or deployment secrets in the Render environment.
+    initializeApp();
 }
 
-const db = admin.firestore();
+// Get initialized services using the modern functions
+const db = getFirestore();
+const auth = getAuth();
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 
-// --- 2. MIDDLEWARE ---
+// --- 3. MIDDLEWARE ---
 // Enable CORS for all requests
 app.use(corsModule({ origin: true }));
 // Parse incoming JSON requests
 app.use(express.json()); 
 
 
-// --- 3. AUTH & AUTHORIZATION LOGIC (Helper Functions) ---
+// --- 4. AUTH & AUTHORIZATION LOGIC (Helper Functions) ---
 
 /**
  * Ensures the user has permission to run the analysis based on their subscription tier
@@ -77,8 +85,8 @@ async function checkSubscription(userId) {
             
             await freeTierUsageRef.set({
                 count: newCount,
-                // Access FieldValue correctly via the admin object
-                last_use: admin.firestore.FieldValue.serverTimestamp()
+                // Use the directly imported FieldValue object
+                last_use: FieldValue.serverTimestamp()
             }, { merge: true });
 
             return { 
@@ -154,7 +162,7 @@ JSON Schema:
 }
 
 
-// --- 4. EXPRESS ROUTE HANDLER ---
+// --- 5. EXPRESS ROUTE HANDLER ---
 
 app.post('/runAnalysis', async (req, res) => {
     
@@ -168,7 +176,8 @@ app.post('/runAnalysis', async (req, res) => {
     let userId;
     try {
         // SECURITY STEP 1: AUTHENTICATE USER
-        const decodedToken = await admin.auth().verifyIdToken(token);
+        // Use the directly imported getAuth() function
+        const decodedToken = await auth.verifyIdToken(token);
         userId = decodedToken.uid;
     } catch (error) {
         console.error("Token verification failed:", error.message);
@@ -200,12 +209,8 @@ app.post('/runAnalysis', async (req, res) => {
 });
 
 
-// --- 5. START SERVER LISTENER ---
+// --- 6. START SERVER LISTENER ---
 
 app.listen(PORT, () => {
     console.log(`EcoPredict AI Backend running on port ${PORT}`);
 });
-
-// Since this is a standard Express app, we don't need module.exports or exports.
-// We keep the export structure for GCF compatibility, but it's not used by Render.
-// module.exports = { runAnalysis_function: app };
